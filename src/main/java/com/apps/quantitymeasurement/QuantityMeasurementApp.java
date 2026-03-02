@@ -2,10 +2,11 @@ package com.apps.quantitymeasurement;
 
 public class QuantityMeasurementApp {
 
-    // Step 1 — LengthUnit Enum with conversion factors
     public enum LengthUnit {
         FEET(1.0),
-        INCHES(1.0 / 12.0);
+        INCHES(1.0 / 12.0),
+        YARDS(3.0),
+        CENTIMETERS(0.393701 / 12.0);  // 1cm = 0.393701 inches = 0.393701/12 feet
 
         private final double conversionFactor;
 
@@ -18,7 +19,6 @@ public class QuantityMeasurementApp {
         }
     }
 
-    // Step 2 — Single QuantityLength class (replaces Feet and Inches)
     public static class QuantityLength {
 
         private final double value;
@@ -30,7 +30,6 @@ public class QuantityMeasurementApp {
             this.unit = unit;
         }
 
-        // Convert to base unit (feet) before comparing
         private double toBaseUnit() {
             return this.value * this.unit.getConversionFactor();
         }
@@ -46,8 +45,14 @@ public class QuantityMeasurementApp {
     }
 
     public static void main(String[] args) {
-        QuantityLength oneFoot = new QuantityLength(1.0, LengthUnit.FEET);
-        QuantityLength twelveInches = new QuantityLength(12.0, LengthUnit.INCHES);
-        System.out.println("1 foot == 12 inches: " + oneFoot.equals(twelveInches));
+        QuantityLength oneYard = new QuantityLength(1.0, LengthUnit.YARDS);
+        QuantityLength threeFeet = new QuantityLength(3.0, LengthUnit.FEET);
+        QuantityLength thirtySixInches = new QuantityLength(36.0, LengthUnit.INCHES);
+        QuantityLength oneCm = new QuantityLength(1.0, LengthUnit.CENTIMETERS);
+        QuantityLength cmInInches = new QuantityLength(0.393701, LengthUnit.INCHES);
+
+        System.out.println("1 yard == 3 feet: " + oneYard.equals(threeFeet));
+        System.out.println("1 yard == 36 inches: " + oneYard.equals(thirtySixInches));
+        System.out.println("1 cm == 0.393701 inches: " + oneCm.equals(cmInInches));
     }
 }
