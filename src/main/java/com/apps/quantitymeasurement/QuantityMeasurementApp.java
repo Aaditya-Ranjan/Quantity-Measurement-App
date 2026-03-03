@@ -130,5 +130,12 @@ public class QuantityMeasurementApp {
         demonstrateLengthAddition(
                 new QuantityLength(1.0, LengthUnit.FEET),
                 new QuantityLength(12.0, LengthUnit.INCHES));
+        // UC9 demos
+        System.out.println("\n=== UC9: Weight Measurements ===");
+        QuantityWeight kg1 = new QuantityWeight(1.0, WeightUnit.KILOGRAM);
+        QuantityWeight g1000 = new QuantityWeight(1000.0, WeightUnit.GRAM);
+        System.out.println("1kg == 1000g: " + kg1.equals(g1000));
+        System.out.println("1kg to grams: " + kg1.convertTo(WeightUnit.GRAM));
+        System.out.println("1kg + 1000g: " + QuantityWeight.add(kg1, g1000));
     }
 }
