@@ -2,7 +2,7 @@ package com.apps.quantitymeasurement;
 
 /**
  * QuantityMeasurementApp - Main application class for quantity measurement operations.
- * Provides length comparison and conversion functionality using the QuantityLength class.
+ * Provides length comparison, conversion, and addition functionality.
  */
 public class QuantityMeasurementApp {
 
@@ -28,7 +28,7 @@ public class QuantityMeasurementApp {
 
     /**
      * QuantityLength represents an immutable length measurement with a value and unit.
-     * Supports equality comparison and unit conversion.
+     * Supports equality comparison, unit conversion, and addition.
      */
     public static class QuantityLength {
 
@@ -46,8 +46,12 @@ public class QuantityMeasurementApp {
             this.unit = unit;
         }
 
+        public double getValue() {
+            return this.value;
+        }
+
         /**
-         * Converts value to base unit (FEET) for comparison.
+         * Converts value to base unit (FEET) for comparison/arithmetic.
          */
         private double toBaseUnit() {
             return this.value * this.unit.getConversionFactor();
@@ -81,6 +85,26 @@ public class QuantityMeasurementApp {
             if (!Double.isFinite(value))
                 throw new IllegalArgumentException("Value must be a finite number");
             return value * (sourceUnit.getConversionFactor() / targetUnit.getConversionFactor());
+        }
+
+        /**
+         * Adds two QuantityLength objects and returns result in the unit of the first operand.
+         *
+         * @param first  first QuantityLength operand
+         * @param second second QuantityLength operand
+         * @return new QuantityLength with sum expressed in first operand's unit
+         * @throws IllegalArgumentException if either operand is null or has invalid value
+         */
+        public static QuantityLength add(QuantityLength first, QuantityLength second) {
+            if (first == null || second == null)
+                throw new IllegalArgumentException("Operands cannot be null");
+            if (!Double.isFinite(first.value) || !Double.isFinite(second.value))
+                throw new IllegalArgumentException("Values must be finite numbers");
+
+            // Add both in base unit (feet), then convert back to first operand's unit
+            double sumInBase = first.toBaseUnit() + second.toBaseUnit();
+            double resultValue = sumInBase / first.unit.getConversionFactor();
+            return new QuantityLength(resultValue, first.unit);
         }
 
         @Override
@@ -123,14 +147,30 @@ public class QuantityMeasurementApp {
         System.out.printf("equals(%s, %s) = %b%n", q1, q2, q1.equals(q2));
     }
 
-    public static void main(String[] args) {
-        demonstrateLengthConversion(1.0, LengthUnit.FEET, LengthUnit.INCHES);
-        demonstrateLengthConversion(3.0, LengthUnit.YARDS, LengthUnit.FEET);
-        demonstrateLengthConversion(36.0, LengthUnit.INCHES, LengthUnit.YARDS);
-        demonstrateLengthConversion(1.0, LengthUnit.CENTIMETERS, LengthUnit.INCHES);
-        demonstrateLengthConversion(0.0, LengthUnit.FEET, LengthUnit.INCHES);
+    /**
+     * Demonstrates addition of two QuantityLength objects.
+     */
+    public static void demonstrateLengthAddition(QuantityLength q1, QuantityLength q2) {
+        QuantityLength result = QuantityLength.add(q1, q2);
+        System.out.printf("add(%s, %s) = %s%n", q1, q2, result);
+    }
 
-        QuantityLength lengthInYards = new QuantityLength(1.0, LengthUnit.YARDS);
-        demonstrateLengthConversion(lengthInYards, LengthUnit.INCHES);
+
+    public static void main(String[] args) {
+        demonstrateLengthAddition(
+                new QuantityLength(1.0, LengthUnit.FEET),
+                new QuantityLength(2.0, LengthUnit.FEET));
+        demonstrateLengthAddition(
+                new QuantityLength(1.0, LengthUnit.FEET),
+                new QuantityLength(12.0, LengthUnit.INCHES));
+        demonstrateLengthAddition(
+                new QuantityLength(12.0, LengthUnit.INCHES),
+                new QuantityLength(1.0, LengthUnit.FEET));
+        demonstrateLengthAddition(
+                new QuantityLength(1.0, LengthUnit.YARDS),
+                new QuantityLength(3.0, LengthUnit.FEET));
+        demonstrateLengthAddition(
+                new QuantityLength(2.54, LengthUnit.CENTIMETERS),
+                new QuantityLength(1.0, LengthUnit.INCHES));
     }
 }
