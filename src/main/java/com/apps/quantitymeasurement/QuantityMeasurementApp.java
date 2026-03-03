@@ -88,23 +88,45 @@ public class QuantityMeasurementApp {
         }
 
         /**
-         * Adds two QuantityLength objects and returns result in the unit of the first operand.
+         * Private utility method for addition - converts both lengths to base unit,
+         * sums them, and converts result to target unit.
+         * Avoids code duplication between overloaded add() methods.
          *
-         * @param first  first QuantityLength operand
-         * @param second second QuantityLength operand
-         * @return new QuantityLength with sum expressed in first operand's unit
-         * @throws IllegalArgumentException if either operand is null or has invalid value
+         * @param first      first QuantityLength operand
+         * @param second     second QuantityLength operand
+         * @param targetUnit unit for the result
+         * @return new QuantityLength in target unit
          */
-        public static QuantityLength add(QuantityLength first, QuantityLength second) {
+        private static QuantityLength addInTargetUnit(QuantityLength first, QuantityLength second, LengthUnit targetUnit) {
             if (first == null || second == null)
                 throw new IllegalArgumentException("Operands cannot be null");
+            if (targetUnit == null)
+                throw new IllegalArgumentException("Target unit cannot be null");
             if (!Double.isFinite(first.value) || !Double.isFinite(second.value))
                 throw new IllegalArgumentException("Values must be finite numbers");
 
-            // Add both in base unit (feet), then convert back to first operand's unit
             double sumInBase = first.toBaseUnit() + second.toBaseUnit();
-            double resultValue = sumInBase / first.unit.getConversionFactor();
-            return new QuantityLength(resultValue, first.unit);
+            double resultValue = Math.round((sumInBase / targetUnit.getConversionFactor()) * 1e10) / 1e10;
+            return new QuantityLength(resultValue, targetUnit);
+        }
+
+        /**
+         * UC6: Adds two lengths, result in unit of first operand.
+         */
+        public static QuantityLength add(QuantityLength first, QuantityLength second) {
+            return addInTargetUnit(first, second, first.unit);
+        }
+
+        /**
+         * UC7: Adds two lengths with explicit target unit specification.
+         *
+         * @param first      first QuantityLength operand
+         * @param second     second QuantityLength operand
+         * @param targetUnit explicitly specified result unit
+         * @return new QuantityLength in specified target unit
+         */
+        public static QuantityLength add(QuantityLength first, QuantityLength second, LengthUnit targetUnit) {
+            return addInTargetUnit(first, second, targetUnit);
         }
 
         @Override
@@ -172,5 +194,21 @@ public class QuantityMeasurementApp {
         demonstrateLengthAddition(
                 new QuantityLength(2.54, LengthUnit.CENTIMETERS),
                 new QuantityLength(1.0, LengthUnit.INCHES));
+        // UC6 demos
+            demonstrateLengthAddition(
+                    new QuantityLength(1.0, LengthUnit.FEET),
+                    new QuantityLength(12.0, LengthUnit.INCHES));
+
+            // UC7 demos
+            System.out.println(QuantityLength.add(
+                    new QuantityLength(1.0, LengthUnit.FEET),
+                    new QuantityLength(12.0, LengthUnit.INCHES),
+                    LengthUnit.YARDS));
+
+            System.out.println(QuantityLength.add(
+                    new QuantityLength(36.0, LengthUnit.INCHES),
+                    new QuantityLength(1.0, LengthUnit.YARDS),
+                    LengthUnit.FEET));
+
     }
 }
