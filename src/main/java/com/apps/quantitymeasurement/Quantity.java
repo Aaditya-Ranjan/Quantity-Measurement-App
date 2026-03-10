@@ -1,16 +1,51 @@
 package com.apps.quantitymeasurement;
 
+import java.util.function.DoubleBinaryOperator;
+
 /**
  * Quantity<U> - Generic immutable value object for any measurement category.
- * Replaces QuantityLength and QuantityWeight with a single, reusable class.
- * Delegates conversion logic to the unit (IMeasurable).
+ * UC13: Arithmetic operations centralized via ArithmeticOperation enum + helpers.
+ * Eliminates code duplication across add(), subtract(), divide() — enforces DRY.
  *
  * @param <U> the unit type, must implement IMeasurable
  */
 public class Quantity<U extends IMeasurable> {
 
+    // ===== ArithmeticOperation Enum (Lambda Style) =====
+
+    /**
+     * Enum encapsulating arithmetic operations via DoubleBinaryOperator lambdas.
+     * Each constant holds its own compute logic — no switch/if-else needed.
+     * Adding new operations (MULTIPLY, MODULO) requires only a new constant.
+     */
+    private enum ArithmeticOperation {
+        ADD((a, b) -> a + b),
+        SUBTRACT((a, b) -> a - b),
+        DIVIDE((a, b) -> {
+            if (b == 0.0) throw new ArithmeticException("Division by zero is not allowed");
+            return a / b;
+        });
+
+        private final DoubleBinaryOperator operator;
+
+        ArithmeticOperation(DoubleBinaryOperator operator) {
+            this.operator = operator;
+        }
+
+        /**
+         * Executes the arithmetic operation on two base-unit values.
+         */
+        public double compute(double a, double b) {
+            return this.operator.applyAsDouble(a, b);
+        }
+    }
+
+    // ===== Fields =====
+
     private final double value;
     private final U unit;
+
+    // ===== Constructor =====
 
     /**
      * @param value numeric measurement value
@@ -25,6 +60,8 @@ public class Quantity<U extends IMeasurable> {
         this.unit = unit;
     }
 
+    // ===== Getters =====
+
     public double getValue() {
         return this.value;
     }
@@ -33,25 +70,69 @@ public class Quantity<U extends IMeasurable> {
         return this.unit;
     }
 
+    // ===== Private Helpers =====
+
     /**
-     * Converts value to base unit for comparison/arithmetic.
+     * Converts this quantity's value to base unit.
      */
     private double toBaseUnit() {
         return this.unit.convertToBaseUnit(this.value);
     }
 
     /**
-     * Converts this quantity to the target unit.
+     * Rounds a double value to 10 decimal places for precision consistency.
+     */
+    private static double roundResult(double value) {
+        return Math.round(value * 1e10) / 1e10;
+    }
+
+    /**
+     * UC13: Centralized validation helper — Single Source of Truth.
+     * Validates null operand, same measurement category, finiteness,
+     * and optionally validates target unit for add/subtract operations.
      *
-     * @param targetUnit unit to convert to
-     * @return new Quantity in target unit
+     * @param other              the other quantity operand
+     * @param targetUnit         target unit (may be null if targetUnitRequired is false)
+     * @param targetUnitRequired whether to validate the target unit
+     * @throws IllegalArgumentException for any validation failure
+     */
+    private void validateArithmeticOperands(Quantity<U> other,
+                                            U targetUnit,
+                                            boolean targetUnitRequired) {
+        if (other == null)
+            throw new IllegalArgumentException("Operand cannot be null");
+        if (this.unit.getClass() != other.unit.getClass())
+            throw new IllegalArgumentException(
+                    "Cannot operate on different measurement categories");
+        if (!Double.isFinite(other.value))
+            throw new IllegalArgumentException("Operand value must be finite");
+        if (targetUnitRequired && targetUnit == null)
+            throw new IllegalArgumentException("Target unit cannot be null");
+    }
+
+    /**
+     * UC13: Core arithmetic helper — performs base-unit conversion and operation.
+     * All arithmetic methods delegate here; validation must be called first.
+     *
+     * @param other     the other quantity operand
+     * @param operation the arithmetic operation to perform
+     * @return result in base unit (dimensionless for DIVIDE)
+     */
+    private double performBaseArithmetic(Quantity<U> other, ArithmeticOperation operation) {
+        double thisBase = this.toBaseUnit();
+        double otherBase = other.toBaseUnit();
+        return operation.compute(thisBase, otherBase);
+    }
+
+    // ===== Conversion =====
+
+    /**
+     * Converts this quantity to the target unit.
      */
     public Quantity<U> convertTo(U targetUnit) {
         if (targetUnit == null)
             throw new IllegalArgumentException("Target unit cannot be null");
-        double baseValue = this.toBaseUnit();
-        double converted = Math.round(
-                targetUnit.convertFromBaseUnit(baseValue) * 1e10) / 1e10;
+        double converted = roundResult(targetUnit.convertFromBaseUnit(this.toBaseUnit()));
         return new Quantity<>(converted, targetUnit);
     }
 
@@ -67,36 +148,56 @@ public class Quantity<U extends IMeasurable> {
         return sourceUnit.convertToBaseUnit(value) / targetUnit.getConversionFactor();
     }
 
-    /**
-     * Private utility method for addition - DRY principle.
-     */
-    private static <U extends IMeasurable> Quantity<U> addInTargetUnit(
-            Quantity<U> first, Quantity<U> second, U targetUnit) {
-        if (first == null || second == null)
-            throw new IllegalArgumentException("Operands cannot be null");
-        if (targetUnit == null)
-            throw new IllegalArgumentException("Target unit cannot be null");
-        double sumInBase = first.toBaseUnit() + second.toBaseUnit();
-        double result = Math.round(
-                targetUnit.convertFromBaseUnit(sumInBase) * 1e10) / 1e10;
-        return new Quantity<>(result, targetUnit);
-    }
+    // ===== Addition =====
 
     /**
-     * UC6 equivalent: result in unit of first operand.
+     * Adds two quantities; result in first operand's unit (implicit).
      */
     public static <U extends IMeasurable> Quantity<U> add(
             Quantity<U> first, Quantity<U> second) {
-        return addInTargetUnit(first, second, first.unit);
+        return add(first, second, first.unit);
     }
 
     /**
-     * UC7 equivalent: result in explicit target unit.
+     * Adds two quantities; result in explicit target unit.
      */
     public static <U extends IMeasurable> Quantity<U> add(
             Quantity<U> first, Quantity<U> second, U targetUnit) {
-        return addInTargetUnit(first, second, targetUnit);
+        first.validateArithmeticOperands(second, targetUnit, true);
+        double baseResult = first.performBaseArithmetic(second, ArithmeticOperation.ADD);
+        return new Quantity<>(roundResult(targetUnit.convertFromBaseUnit(baseResult)), targetUnit);
     }
+
+    // ===== Subtraction =====
+
+    /**
+     * Subtracts other from this; result in this quantity's unit (implicit).
+     */
+    public Quantity<U> subtract(Quantity<U> other) {
+        return subtract(other, this.unit);
+    }
+
+    /**
+     * Subtracts other from this; result in explicit target unit.
+     */
+    public Quantity<U> subtract(Quantity<U> other, U targetUnit) {
+        validateArithmeticOperands(other, targetUnit, true);
+        double baseResult = performBaseArithmetic(other, ArithmeticOperation.SUBTRACT);
+        return new Quantity<>(roundResult(targetUnit.convertFromBaseUnit(baseResult)), targetUnit);
+    }
+
+    // ===== Division =====
+
+    /**
+     * Divides this by other; returns dimensionless scalar ratio.
+     * ArithmeticException thrown for division by zero.
+     */
+    public double divide(Quantity<U> other) {
+        validateArithmeticOperands(other, null, false);
+        return performBaseArithmetic(other, ArithmeticOperation.DIVIDE);
+    }
+
+    // ===== equals / hashCode / toString =====
 
     @Override
     public boolean equals(Object obj) {
@@ -104,7 +205,6 @@ public class Quantity<U extends IMeasurable> {
         if (obj == null) return false;
         if (this.getClass() != obj.getClass()) return false;
         Quantity<?> other = (Quantity<?>) obj;
-        // Cross-category prevention
         if (this.unit.getClass() != other.unit.getClass()) return false;
         return Double.compare(this.toBaseUnit(), other.toBaseUnit()) == 0;
     }
@@ -117,81 +217,5 @@ public class Quantity<U extends IMeasurable> {
     @Override
     public String toString() {
         return value + " " + unit.getUnitName();
-    }
-
-    /**
-     * Validates that another quantity is non-null and in the same measurement category.
-     */
-    private void validateSameCategory(Quantity<?> other) {
-        if (other == null)
-            throw new IllegalArgumentException("Operand cannot be null");
-        if (this.unit.getClass() != other.unit.getClass())
-            throw new IllegalArgumentException(
-                    "Cannot operate on different measurement categories");
-    }
-
-    /**
-     * Private utility method for subtraction - DRY principle.
-     * Mirrors addInTargetUnit() pattern.
-     */
-    private static <U extends IMeasurable> Quantity<U> subtractInTargetUnit(
-            Quantity<U> first, Quantity<U> second, U targetUnit) {
-        if (first == null || second == null)
-            throw new IllegalArgumentException("Operands cannot be null");
-        if (targetUnit == null)
-            throw new IllegalArgumentException("Target unit cannot be null");
-        if (first.unit.getClass() != second.unit.getClass())
-            throw new IllegalArgumentException(
-                    "Cannot subtract different measurement categories");
-        double diffInBase = first.toBaseUnit() - second.toBaseUnit();
-        double resultValue = Math.round(
-                targetUnit.convertFromBaseUnit(diffInBase) * 1e10) / 1e10;
-        return new Quantity<>(resultValue, targetUnit);
-    }
-
-    /**
-     * UC12: Subtracts another quantity from this quantity.
-     * Result is expressed in this quantity's unit (implicit target).
-     *
-     * @param other quantity to subtract (must be same measurement category)
-     * @return new Quantity with the difference in this unit
-     * @throws IllegalArgumentException if other is null or different category
-     */
-    public Quantity<U> subtract(Quantity<U> other) {
-        return subtractInTargetUnit(this, other, this.unit);
-    }
-
-    /**
-     * UC12: Subtracts another quantity from this quantity.
-     * Result is expressed in specified target unit (explicit target).
-     *
-     * @param other      quantity to subtract (must be same measurement category)
-     * @param targetUnit unit for the result
-     * @return new Quantity with the difference in target unit
-     * @throws IllegalArgumentException if other/targetUnit is null or different category
-     */
-    public Quantity<U> subtract(Quantity<U> other, U targetUnit) {
-        return subtractInTargetUnit(this, other, targetUnit);
-    }
-
-    /**
-     * UC12: Divides this quantity by another, returning a dimensionless scalar ratio.
-     * Both quantities are converted to base unit before division.
-     *
-     * @param other the divisor quantity (must be same measurement category, non-zero)
-     * @return dimensionless double representing the ratio this / other
-     * @throws IllegalArgumentException if other is null or different category
-     * @throws ArithmeticException      if other represents a zero quantity
-     */
-    public double divide(Quantity<U> other) {
-        if (other == null)
-            throw new IllegalArgumentException("Divisor cannot be null");
-        if (this.unit.getClass() != other.unit.getClass())
-            throw new IllegalArgumentException(
-                    "Cannot divide different measurement categories");
-        double divisorBase = other.toBaseUnit();
-        if (divisorBase == 0.0)
-            throw new ArithmeticException("Division by zero is not allowed");
-        return this.toBaseUnit() / divisorBase;
     }
 }
