@@ -71,5 +71,17 @@ public class QuantityMeasurementApp {
         Quantity<LengthUnit> length = new Quantity<>(1.0, LengthUnit.FEET);
         Quantity<WeightUnit> weight = new Quantity<>(1.0, WeightUnit.KILOGRAM);
         System.out.println("1 foot == 1 kg: " + length.equals(weight));
+
+        System.out.println("\n=== UC11: Volume Measurements ===");
+        Quantity<VolumeUnit> litre = new Quantity<>(1.0, VolumeUnit.LITRE);
+        Quantity<VolumeUnit> millilitres = new Quantity<>(1000.0, VolumeUnit.MILLILITRE);
+        Quantity<VolumeUnit> gallon = new Quantity<>(1.0, VolumeUnit.GALLON);
+
+        demonstrateEquality(litre, millilitres);
+        demonstrateConversion(litre, VolumeUnit.MILLILITRE);
+        demonstrateAddition(litre, millilitres, VolumeUnit.LITRE);
+        demonstrateEquality(
+                new Quantity<>(3.78541, VolumeUnit.LITRE),
+                gallon);
     }
 }
