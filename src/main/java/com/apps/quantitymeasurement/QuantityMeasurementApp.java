@@ -44,6 +44,34 @@ public class QuantityMeasurementApp {
                 q1, q2, targetUnit.getUnitName(), result);
     }
 
+    /**
+     * Generic subtraction demonstration - works for any measurement category.
+     */
+    public static <U extends IMeasurable> void demonstrateSubtraction(
+            Quantity<U> q1, Quantity<U> q2) {
+        Quantity<U> result = q1.subtract(q2);
+        System.out.printf("subtract(%s, %s) = %s%n", q1, q2, result);
+    }
+
+    /**
+     * Generic subtraction with explicit target unit.
+     */
+    public static <U extends IMeasurable> void demonstrateSubtraction(
+            Quantity<U> q1, Quantity<U> q2, U targetUnit) {
+        Quantity<U> result = q1.subtract(q2, targetUnit);
+        System.out.printf("subtract(%s, %s, %s) = %s%n",
+                q1, q2, targetUnit.getUnitName(), result);
+    }
+
+    /**
+     * Generic division demonstration - works for any measurement category.
+     */
+    public static <U extends IMeasurable> void demonstrateDivision(
+            Quantity<U> q1, Quantity<U> q2) {
+        double result = q1.divide(q2);
+        System.out.printf("divide(%s, %s) = %.6f%n", q1, q2, result);
+    }
+
     public static void main(String[] args) {
         System.out.println("=== Length Operations ===");
         demonstrateEquality(
@@ -83,5 +111,36 @@ public class QuantityMeasurementApp {
         demonstrateEquality(
                 new Quantity<>(3.78541, VolumeUnit.LITRE),
                 gallon);
+
+        System.out.println("\n=== UC12: Subtraction ===");
+        demonstrateSubtraction(
+                new Quantity<>(10.0, LengthUnit.FEET),
+                new Quantity<>(6.0, LengthUnit.INCHES));
+        demonstrateSubtraction(
+                new Quantity<>(10.0, LengthUnit.FEET),
+                new Quantity<>(6.0, LengthUnit.INCHES),
+                LengthUnit.INCHES);
+        demonstrateSubtraction(
+                new Quantity<>(10.0, WeightUnit.KILOGRAM),
+                new Quantity<>(5000.0, WeightUnit.GRAM));
+        demonstrateSubtraction(
+                new Quantity<>(5.0, VolumeUnit.LITRE),
+                new Quantity<>(2.0, VolumeUnit.LITRE),
+                VolumeUnit.MILLILITRE);
+
+        System.out.println("\n=== UC12: Division ===");
+        demonstrateDivision(
+                new Quantity<>(10.0, LengthUnit.FEET),
+                new Quantity<>(2.0, LengthUnit.FEET));
+        demonstrateDivision(
+                new Quantity<>(24.0, LengthUnit.INCHES),
+                new Quantity<>(2.0, LengthUnit.FEET));
+        demonstrateDivision(
+                new Quantity<>(2000.0, WeightUnit.GRAM),
+                new Quantity<>(1.0, WeightUnit.KILOGRAM));
+        demonstrateDivision(
+                new Quantity<>(5.0, VolumeUnit.LITRE),
+                new Quantity<>(10.0, VolumeUnit.LITRE));
+
     }
 }
