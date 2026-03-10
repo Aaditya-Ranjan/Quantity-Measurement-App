@@ -142,5 +142,33 @@ public class QuantityMeasurementApp {
                 new Quantity<>(5.0, VolumeUnit.LITRE),
                 new Quantity<>(10.0, VolumeUnit.LITRE));
 
+        System.out.println("\n=== UC14: Temperature Measurements ===");
+        Quantity<TemperatureUnit> celsius0   = new Quantity<>(0.0, TemperatureUnit.CELSIUS);
+        Quantity<TemperatureUnit> fahrenheit32 = new Quantity<>(32.0, TemperatureUnit.FAHRENHEIT);
+        Quantity<TemperatureUnit> celsius100 = new Quantity<>(100.0, TemperatureUnit.CELSIUS);
+
+        demonstrateEquality(celsius0, fahrenheit32);
+        demonstrateConversion(celsius0, TemperatureUnit.FAHRENHEIT);
+        demonstrateConversion(celsius100, TemperatureUnit.FAHRENHEIT);
+        demonstrateConversion(new Quantity<>(32.0, TemperatureUnit.FAHRENHEIT),
+                TemperatureUnit.CELSIUS);
+
+        System.out.println("\n--- Temperature Unsupported Operations ---");
+        try {
+            Quantity.add(celsius100, celsius0);
+        } catch (UnsupportedOperationException e) {
+            System.out.println("add() blocked: " + e.getMessage());
+        }
+        try {
+            celsius100.subtract(celsius0);
+        } catch (UnsupportedOperationException e) {
+            System.out.println("subtract() blocked: " + e.getMessage());
+        }
+        try {
+            celsius100.divide(celsius0);
+        } catch (UnsupportedOperationException e) {
+            System.out.println("divide() blocked: " + e.getMessage());
+        }
+
     }
 }

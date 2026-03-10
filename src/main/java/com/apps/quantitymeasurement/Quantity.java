@@ -119,6 +119,8 @@ public class Quantity<U extends IMeasurable> {
      * @return result in base unit (dimensionless for DIVIDE)
      */
     private double performBaseArithmetic(Quantity<U> other, ArithmeticOperation operation) {
+        // UC14: Validate that this unit supports the requested arithmetic operation
+        this.unit.validateOperationSupport(operation.name());
         double thisBase = this.toBaseUnit();
         double otherBase = other.toBaseUnit();
         return operation.compute(thisBase, otherBase);
@@ -132,7 +134,8 @@ public class Quantity<U extends IMeasurable> {
     public Quantity<U> convertTo(U targetUnit) {
         if (targetUnit == null)
             throw new IllegalArgumentException("Target unit cannot be null");
-        double converted = roundResult(targetUnit.convertFromBaseUnit(this.toBaseUnit()));
+        double celsiusBase = this.unit.convertToBaseUnit(this.value);
+        double converted = roundResult(targetUnit.convertFromBaseUnit(celsiusBase));
         return new Quantity<>(converted, targetUnit);
     }
 
