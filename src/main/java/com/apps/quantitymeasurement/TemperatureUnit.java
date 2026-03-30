@@ -80,4 +80,6 @@ public enum TemperatureUnit implements IMeasurable {
                 "Temperature does not support " + operation +
                         ". Arithmetic on absolute temperatures is not physically meaningful.");
     }
+    @Override
+    public String getMeasurementType() { return "TEMPERATURE"; }
 }

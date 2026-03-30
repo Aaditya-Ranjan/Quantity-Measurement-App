@@ -2,6 +2,17 @@ package com.apps.quantitymeasurement;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
+import com.apps.quantitymeasurement.entity.QuantityDTO;
+import com.apps.quantitymeasurement.entity.QuantityMeasurementEntity;
+import com.apps.quantitymeasurement.entity.QuantityModel;
+import com.apps.quantitymeasurement.exception.QuantityMeasurementException;
+import com.apps.quantitymeasurement.repository.IQuantityMeasurementRepository;
+import com.apps.quantitymeasurement.service.IQuantityMeasurementService;
+import com.apps.quantitymeasurement.service.QuantityMeasurementServiceImpl;
+import com.apps.quantitymeasurement.controller.QuantityMeasurementController;
+import org.junit.jupiter.api.BeforeEach;
+import java.util.ArrayList;
+import java.util.List;
 
 public class QuantityMeasurementAppTest {
 
@@ -1344,5 +1355,320 @@ public class QuantityMeasurementAppTest {
         // Volume still fully functional
         assertTrue(new Quantity<>(1.0, VolumeUnit.LITRE)
                 .equals(new Quantity<>(1000.0, VolumeUnit.MILLILITRE)));
+    }
+
+    // ===== UC15: N-Tier Architecture Tests =====
+
+    private IQuantityMeasurementService service;
+    private List<QuantityMeasurementEntity> testStore;
+
+    @BeforeEach
+    void setUpService() {
+        testStore = new ArrayList<>();
+        IQuantityMeasurementRepository testRepo = new IQuantityMeasurementRepository() {
+            @Override public void save(QuantityMeasurementEntity e) { testStore.add(e); }
+            @Override public List<QuantityMeasurementEntity> getAllMeasurements() { return testStore; }
+            @Override public void clearAll() { testStore.clear(); }
+        };
+        service = new QuantityMeasurementServiceImpl(testRepo);
+    }
+
+// --- QuantityDTO Tests ---
+
+    @Test
+    public void testQuantityDTO_LengthUnit_Creation() {
+        QuantityDTO dto = new QuantityDTO(1.0, QuantityDTO.LengthUnit.FEET);
+        assertEquals(1.0, dto.getValue(), EPSILON);
+        assertEquals("FEET", dto.getUnit().getUnitName());
+        assertEquals("LENGTH", dto.getUnit().getMeasurementType());
+    }
+
+    @Test
+    public void testQuantityDTO_WeightUnit_Creation() {
+        QuantityDTO dto = new QuantityDTO(500.0, QuantityDTO.WeightUnit.GRAM);
+        assertEquals(500.0, dto.getValue(), EPSILON);
+        assertEquals("GRAM", dto.getUnit().getUnitName());
+        assertEquals("WEIGHT", dto.getUnit().getMeasurementType());
+    }
+
+    @Test
+    public void testQuantityDTO_TemperatureUnit_Creation() {
+        QuantityDTO dto = new QuantityDTO(100.0, QuantityDTO.TemperatureUnit.CELSIUS);
+        assertEquals("TEMPERATURE", dto.getUnit().getMeasurementType());
+        assertEquals("CELSIUS", dto.getUnit().getUnitName());
+    }
+
+    @Test
+    public void testQuantityDTO_ToString() {
+        QuantityDTO dto = new QuantityDTO(1.0, QuantityDTO.LengthUnit.FEET);
+        assertEquals("1.0 FEET", dto.toString());
+    }
+
+// --- QuantityModel Tests ---
+
+    @Test
+    public void testQuantityModel_Creation() {
+        QuantityModel<LengthUnit> model = new QuantityModel<>(1.0, LengthUnit.FEET);
+        assertEquals(1.0, model.getValue(), EPSILON);
+        assertEquals(LengthUnit.FEET, model.getUnit());
+    }
+
+    @Test
+    public void testQuantityModel_Weight_Creation() {
+        QuantityModel<WeightUnit> model = new QuantityModel<>(1000.0, WeightUnit.GRAM);
+        assertEquals(1000.0, model.getValue(), EPSILON);
+        assertEquals(WeightUnit.GRAM, model.getUnit());
+    }
+
+// --- QuantityMeasurementEntity Tests ---
+
+    @Test
+    public void testQuantityMeasurementEntity_BinaryConstruction() {
+        QuantityDTO op1 = new QuantityDTO(1.0, QuantityDTO.LengthUnit.FEET);
+        QuantityDTO op2 = new QuantityDTO(12.0, QuantityDTO.LengthUnit.INCHES);
+        QuantityMeasurementEntity entity = new QuantityMeasurementEntity(
+                op1, op2, "COMPARE", "true");
+        assertEquals("COMPARE", entity.getOperation());
+        assertEquals("true", entity.getResult());
+        assertFalse(entity.hasError());
+    }
+
+    @Test
+    public void testQuantityMeasurementEntity_ErrorConstruction() {
+        QuantityDTO op1 = new QuantityDTO(1.0, QuantityDTO.LengthUnit.FEET);
+        QuantityMeasurementEntity entity = new QuantityMeasurementEntity(
+                op1, null, "DIVIDE", "Division by zero", true);
+        assertTrue(entity.hasError());
+        assertEquals("Division by zero", entity.getErrorMessage());
+    }
+
+    @Test
+    public void testQuantityMeasurementEntity_SingleOperandConstruction() {
+        QuantityDTO op1 = new QuantityDTO(1.0, QuantityDTO.LengthUnit.FEET);
+        QuantityMeasurementEntity entity = new QuantityMeasurementEntity(
+                op1, "CONVERT", "12.0 INCHES");
+        assertEquals("CONVERT", entity.getOperation());
+        assertNull(entity.getOperand2());
+        assertFalse(entity.hasError());
+    }
+
+// --- Service Layer Tests ---
+
+    @Test
+    public void testService_CompareEquality_SameUnit() {
+        QuantityDTO q1 = new QuantityDTO(1.0, QuantityDTO.LengthUnit.FEET);
+        QuantityDTO q2 = new QuantityDTO(1.0, QuantityDTO.LengthUnit.FEET);
+        assertTrue(service.compareEquality(q1, q2));
+    }
+
+    @Test
+    public void testService_CompareEquality_CrossUnit_True() {
+        QuantityDTO q1 = new QuantityDTO(1.0, QuantityDTO.LengthUnit.FEET);
+        QuantityDTO q2 = new QuantityDTO(12.0, QuantityDTO.LengthUnit.INCHES);
+        assertTrue(service.compareEquality(q1, q2));
+    }
+
+    @Test
+    public void testService_CompareEquality_CrossUnit_False() {
+        QuantityDTO q1 = new QuantityDTO(1.0, QuantityDTO.LengthUnit.FEET);
+        QuantityDTO q2 = new QuantityDTO(5.0, QuantityDTO.LengthUnit.INCHES);
+        assertFalse(service.compareEquality(q1, q2));
+    }
+
+    @Test
+    public void testService_CompareEquality_CrossCategory_ThrowsException() {
+        QuantityDTO q1 = new QuantityDTO(1.0, QuantityDTO.LengthUnit.FEET);
+        QuantityDTO q2 = new QuantityDTO(1.0, QuantityDTO.WeightUnit.KILOGRAM);
+        assertThrows(QuantityMeasurementException.class,
+                () -> service.compareEquality(q1, q2));
+    }
+
+    @Test
+    public void testService_CompareEquality_NullOperand_ThrowsException() {
+        QuantityDTO q1 = new QuantityDTO(1.0, QuantityDTO.LengthUnit.FEET);
+        assertThrows(QuantityMeasurementException.class,
+                () -> service.compareEquality(q1, null));
+    }
+
+    @Test
+    public void testService_Convert_FeetToInches() {
+        QuantityDTO input = new QuantityDTO(1.0, QuantityDTO.LengthUnit.FEET);
+        QuantityDTO result = service.convert(input, QuantityDTO.LengthUnit.INCHES);
+        assertEquals(12.0, result.getValue(), EPSILON);
+        assertEquals("INCHES", result.getUnit().getUnitName());
+    }
+
+    @Test
+    public void testService_Convert_KilogramToGram() {
+        QuantityDTO input = new QuantityDTO(1.0, QuantityDTO.WeightUnit.KILOGRAM);
+        QuantityDTO result = service.convert(input, QuantityDTO.WeightUnit.GRAM);
+        assertEquals(1000.0, result.getValue(), EPSILON);
+    }
+
+    @Test
+    public void testService_Convert_CelsiusToFahrenheit() {
+        QuantityDTO input = new QuantityDTO(100.0, QuantityDTO.TemperatureUnit.CELSIUS);
+        QuantityDTO result = service.convert(input, QuantityDTO.TemperatureUnit.FAHRENHEIT);
+        assertEquals(212.0, result.getValue(), EPSILON);
+    }
+
+    @Test
+    public void testService_Convert_CrossUnitType_ThrowsException() {
+        QuantityDTO input = new QuantityDTO(1.0, QuantityDTO.LengthUnit.FEET);
+        assertThrows(QuantityMeasurementException.class,
+                () -> service.convert(input, QuantityDTO.WeightUnit.KILOGRAM));
+    }
+
+    @Test
+    public void testService_Add_SameUnit_Length() {
+        QuantityDTO q1 = new QuantityDTO(1.0, QuantityDTO.LengthUnit.FEET);
+        QuantityDTO q2 = new QuantityDTO(2.0, QuantityDTO.LengthUnit.FEET);
+        QuantityDTO result = service.add(q1, q2, QuantityDTO.LengthUnit.FEET);
+        assertEquals(3.0, result.getValue(), EPSILON);
+    }
+
+    @Test
+    public void testService_Add_CrossUnit_Length() {
+        QuantityDTO q1 = new QuantityDTO(1.0, QuantityDTO.LengthUnit.FEET);
+        QuantityDTO q2 = new QuantityDTO(12.0, QuantityDTO.LengthUnit.INCHES);
+        QuantityDTO result = service.add(q1, q2, QuantityDTO.LengthUnit.FEET);
+        assertEquals(2.0, result.getValue(), EPSILON);
+    }
+
+    @Test
+    public void testService_Add_Weight() {
+        QuantityDTO q1 = new QuantityDTO(1.0, QuantityDTO.WeightUnit.KILOGRAM);
+        QuantityDTO q2 = new QuantityDTO(1000.0, QuantityDTO.WeightUnit.GRAM);
+        QuantityDTO result = service.add(q1, q2, QuantityDTO.WeightUnit.KILOGRAM);
+        assertEquals(2.0, result.getValue(), EPSILON);
+    }
+
+    @Test
+    public void testService_Add_Temperature_ThrowsUnsupported() {
+        QuantityDTO q1 = new QuantityDTO(100.0, QuantityDTO.TemperatureUnit.CELSIUS);
+        QuantityDTO q2 = new QuantityDTO(50.0, QuantityDTO.TemperatureUnit.CELSIUS);
+        assertThrows(QuantityMeasurementException.class,
+                () -> service.add(q1, q2, QuantityDTO.TemperatureUnit.CELSIUS));
+    }
+
+    @Test
+    public void testService_Subtract_Length() {
+        QuantityDTO q1 = new QuantityDTO(10.0, QuantityDTO.LengthUnit.FEET);
+        QuantityDTO q2 = new QuantityDTO(6.0, QuantityDTO.LengthUnit.INCHES);
+        QuantityDTO result = service.subtract(q1, q2, QuantityDTO.LengthUnit.FEET);
+        assertEquals(9.5, result.getValue(), EPSILON);
+    }
+
+    @Test
+    public void testService_Subtract_Weight() {
+        QuantityDTO q1 = new QuantityDTO(10.0, QuantityDTO.WeightUnit.KILOGRAM);
+        QuantityDTO q2 = new QuantityDTO(5000.0, QuantityDTO.WeightUnit.GRAM);
+        QuantityDTO result = service.subtract(q1, q2, QuantityDTO.WeightUnit.KILOGRAM);
+        assertEquals(5.0, result.getValue(), EPSILON);
+    }
+
+    @Test
+    public void testService_Divide_Length() {
+        QuantityDTO q1 = new QuantityDTO(10.0, QuantityDTO.LengthUnit.FEET);
+        QuantityDTO q2 = new QuantityDTO(2.0, QuantityDTO.LengthUnit.FEET);
+        assertEquals(5.0, service.divide(q1, q2), EPSILON);
+    }
+
+    @Test
+    public void testService_Divide_ByZero_ThrowsException() {
+        QuantityDTO q1 = new QuantityDTO(10.0, QuantityDTO.LengthUnit.FEET);
+        QuantityDTO q2 = new QuantityDTO(0.0, QuantityDTO.LengthUnit.FEET);
+        assertThrows(QuantityMeasurementException.class,
+                () -> service.divide(q1, q2));
+    }
+
+    @Test
+    public void testService_OperationSaved_ToRepository() {
+        QuantityDTO q1 = new QuantityDTO(1.0, QuantityDTO.LengthUnit.FEET);
+        QuantityDTO q2 = new QuantityDTO(12.0, QuantityDTO.LengthUnit.INCHES);
+        service.compareEquality(q1, q2);
+        assertEquals(1, testStore.size());
+        assertEquals("COMPARE", testStore.get(0).getOperation());
+    }
+
+// --- Controller Tests ---
+
+    @Test
+    public void testController_NullService_ThrowsException() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new QuantityMeasurementController(null));
+    }
+
+    @Test
+    public void testController_PerformEquality_DoesNotThrow() {
+        QuantityMeasurementController controller = new QuantityMeasurementController(service);
+        assertDoesNotThrow(() -> controller.performEquality(
+                new QuantityDTO(1.0, QuantityDTO.LengthUnit.FEET),
+                new QuantityDTO(12.0, QuantityDTO.LengthUnit.INCHES)));
+    }
+
+    @Test
+    public void testController_PerformConversion_DoesNotThrow() {
+        QuantityMeasurementController controller = new QuantityMeasurementController(service);
+        assertDoesNotThrow(() -> controller.performConversion(
+                new QuantityDTO(1.0, QuantityDTO.LengthUnit.FEET),
+                QuantityDTO.LengthUnit.INCHES));
+    }
+
+    @Test
+    public void testController_PerformAddition_ErrorHandled_DoesNotThrow() {
+        QuantityMeasurementController controller = new QuantityMeasurementController(service);
+        // Temperature addition is unsupported — controller should handle gracefully
+        assertDoesNotThrow(() -> controller.performAddition(
+                new QuantityDTO(100.0, QuantityDTO.TemperatureUnit.CELSIUS),
+                new QuantityDTO(50.0, QuantityDTO.TemperatureUnit.CELSIUS),
+                QuantityDTO.TemperatureUnit.CELSIUS));
+    }
+
+    @Test
+    public void testController_PerformDivision_DoesNotThrow() {
+        QuantityMeasurementController controller = new QuantityMeasurementController(service);
+        assertDoesNotThrow(() -> controller.performDivision(
+                new QuantityDTO(10.0, QuantityDTO.LengthUnit.FEET),
+                new QuantityDTO(2.0, QuantityDTO.LengthUnit.FEET)));
+    }
+
+// --- IMeasurable getMeasurementType Tests ---
+
+    @Test
+    public void testIMeasurable_LengthUnit_MeasurementType() {
+        assertEquals("LENGTH", LengthUnit.FEET.getMeasurementType());
+        assertEquals("LENGTH", LengthUnit.INCHES.getMeasurementType());
+    }
+
+    @Test
+    public void testIMeasurable_WeightUnit_MeasurementType() {
+        assertEquals("WEIGHT", WeightUnit.KILOGRAM.getMeasurementType());
+    }
+
+    @Test
+    public void testIMeasurable_VolumeUnit_MeasurementType() {
+        assertEquals("VOLUME", VolumeUnit.LITRE.getMeasurementType());
+    }
+
+    @Test
+    public void testIMeasurable_TemperatureUnit_MeasurementType() {
+        assertEquals("TEMPERATURE", TemperatureUnit.CELSIUS.getMeasurementType());
+    }
+
+    @Test
+    public void testBackwardCompatibility_UC1ToUC14_AllCategoriesUnchanged() {
+        // Length
+        assertTrue(new Quantity<>(1.0, LengthUnit.FEET)
+                .equals(new Quantity<>(12.0, LengthUnit.INCHES)));
+        // Weight
+        assertTrue(new Quantity<>(1.0, WeightUnit.KILOGRAM)
+                .equals(new Quantity<>(1000.0, WeightUnit.GRAM)));
+        // Volume
+        assertTrue(new Quantity<>(1.0, VolumeUnit.LITRE)
+                .equals(new Quantity<>(1000.0, VolumeUnit.MILLILITRE)));
+        // Temperature
+        assertTrue(new Quantity<>(0.0, TemperatureUnit.CELSIUS)
+                .equals(new Quantity<>(32.0, TemperatureUnit.FAHRENHEIT)));
     }
 }
