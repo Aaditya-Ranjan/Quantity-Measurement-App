@@ -1,23 +1,30 @@
 package com.app.quantitymeasurement.service;
 
-import com.app.quantitymeasurement.entity.QuantityDTO;
+import com.app.quantitymeasurement.model.QuantityDTO;
+import com.app.quantitymeasurement.model.QuantityMeasurementDTO;
+import java.util.List;
 
 /**
  * IQuantityMeasurementService - Business logic contract.
- * UC15: Interface Segregation — controller depends on abstraction, not implementation.
- * All methods accept and return QuantityDTO (external contract).
+ * UC17: Methods now return QuantityMeasurementDTO for structured API responses.
  */
 public interface IQuantityMeasurementService {
 
-    boolean compareEquality(QuantityDTO quantity1, QuantityDTO quantity2);
+    QuantityMeasurementDTO compareEquality(QuantityDTO qty1, QuantityDTO qty2);
 
-    QuantityDTO convert(QuantityDTO quantity, QuantityDTO.IMeasurableUnit targetUnit);
+    QuantityMeasurementDTO convert(QuantityDTO quantity, QuantityDTO targetUnit);
 
-    QuantityDTO add(QuantityDTO quantity1, QuantityDTO quantity2,
-                    QuantityDTO.IMeasurableUnit targetUnit);
+    QuantityMeasurementDTO add(QuantityDTO qty1, QuantityDTO qty2);
 
-    QuantityDTO subtract(QuantityDTO quantity1, QuantityDTO quantity2,
-                         QuantityDTO.IMeasurableUnit targetUnit);
+    QuantityMeasurementDTO subtract(QuantityDTO qty1, QuantityDTO qty2);
 
-    double divide(QuantityDTO quantity1, QuantityDTO quantity2);
+    QuantityMeasurementDTO divide(QuantityDTO qty1, QuantityDTO qty2);
+
+    List<QuantityMeasurementDTO> getHistoryByOperation(String operation);
+
+    List<QuantityMeasurementDTO> getHistoryByMeasurementType(String measurementType);
+
+    long getOperationCount(String operation);
+
+    List<QuantityMeasurementDTO> getErrorHistory();
 }

@@ -1,87 +1,143 @@
 package com.app.quantitymeasurement.controller;
 
-import com.app.quantitymeasurement.entity.QuantityDTO;
-import com.app.quantitymeasurement.exception.QuantityMeasurementException;
+import com.app.quantitymeasurement.model.*;
 import com.app.quantitymeasurement.service.IQuantityMeasurementService;
-import org.junit.jupiter.api.*;
-import org.mockito.*;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import com.app.quantitymeasurement.config.SecurityConfig;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@WebMvcTest(QuantityMeasurementController.class)
+@Import(SecurityConfig.class)
 class QuantityMeasurementControllerTest {
 
-    @Mock
-    private IQuantityMeasurementService mockService;
+    @Autowired MockMvc mockMvc;
+    @Autowired ObjectMapper objectMapper;
+    @MockBean IQuantityMeasurementService service;
 
-    private QuantityMeasurementController controller;
+    private QuantityInputDTO buildInput(String v1, String u1, String t1,
+                                        String v2, String u2, String t2) {
+        QuantityDTO q1 = new QuantityDTO(Double.parseDouble(v1), u1, t1);
+        QuantityDTO q2 = new QuantityDTO(Double.parseDouble(v2), u2, t2);
+        return new QuantityInputDTO(q1, q2);
+    }
 
-    @BeforeEach
-    void setup() {
-        MockitoAnnotations.openMocks(this);
-        controller = new QuantityMeasurementController(mockService);
+    private QuantityMeasurementDTO successDTO(String op) {
+        QuantityMeasurementDTO dto = new QuantityMeasurementDTO();
+        dto.setOperation(op);
+        dto.setError(false);
+        return dto;
     }
 
     @Test
-    void testConstructor_NullService_ThrowsException() {
-        assertThrows(IllegalArgumentException.class,
-                () -> new QuantityMeasurementController(null));
+    void testCompare_Returns200() throws Exception {
+        when(service.compareEquality(any(), any())).thenReturn(successDTO("compare"));
+        mockMvc.perform(post("/api/v1/quantities/compare")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                buildInput("1.0","FEET","LengthUnit",
+                                        "12.0","INCHES","LengthUnit"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.operation").value("compare"));
     }
 
     @Test
-    void testPerformEquality_CallsService() {
-        QuantityDTO q1 = new QuantityDTO(1.0, QuantityDTO.LengthUnit.FEET);
-        QuantityDTO q2 = new QuantityDTO(12.0, QuantityDTO.LengthUnit.INCHES);
-        when(mockService.compareEquality(q1, q2)).thenReturn(true);
-        assertDoesNotThrow(() -> controller.performEquality(q1, q2));
-        verify(mockService, times(1)).compareEquality(q1, q2);
+    void testConvert_Returns200() throws Exception {
+        QuantityMeasurementDTO dto = successDTO("convert");
+        dto.setResultValue(12.0);
+        when(service.convert(any(), any())).thenReturn(dto);
+        mockMvc.perform(post("/api/v1/quantities/convert")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                buildInput("1.0","FEET","LengthUnit",
+                                        "0.0","INCHES","LengthUnit"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultValue").value(12.0));
     }
 
     @Test
-    void testPerformEquality_ServiceThrows_HandledGracefully() {
-        QuantityDTO q1 = new QuantityDTO(1.0, QuantityDTO.LengthUnit.FEET);
-        QuantityDTO q2 = new QuantityDTO(1.0, QuantityDTO.WeightUnit.KILOGRAM);
-        when(mockService.compareEquality(q1, q2))
-                .thenThrow(new QuantityMeasurementException("Category mismatch"));
-        assertDoesNotThrow(() -> controller.performEquality(q1, q2));
+    void testAdd_Returns200() throws Exception {
+        QuantityMeasurementDTO dto = successDTO("add");
+        dto.setResultValue(2.0);
+        dto.setResultUnit("FEET");
+        when(service.add(any(), any())).thenReturn(dto);
+        mockMvc.perform(post("/api/v1/quantities/add")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                buildInput("1.0","FEET","LengthUnit",
+                                        "12.0","INCHES","LengthUnit"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultValue").value(2.0));
     }
 
     @Test
-    void testPerformConversion_CallsService() {
-        QuantityDTO input = new QuantityDTO(1.0, QuantityDTO.LengthUnit.FEET);
-        QuantityDTO expected = new QuantityDTO(12.0, QuantityDTO.LengthUnit.INCHES);
-        when(mockService.convert(input, QuantityDTO.LengthUnit.INCHES)).thenReturn(expected);
-        assertDoesNotThrow(() ->
-                controller.performConversion(input, QuantityDTO.LengthUnit.INCHES));
-        verify(mockService).convert(input, QuantityDTO.LengthUnit.INCHES);
+    void testSubtract_Returns200() throws Exception {
+        QuantityMeasurementDTO dto = successDTO("subtract");
+        dto.setResultValue(9.5);
+        when(service.subtract(any(), any())).thenReturn(dto);
+        mockMvc.perform(post("/api/v1/quantities/subtract")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                buildInput("10.0","FEET","LengthUnit",
+                                        "6.0","INCHES","LengthUnit"))))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void testPerformAddition_CallsService() {
-        QuantityDTO q1 = new QuantityDTO(1.0, QuantityDTO.LengthUnit.FEET);
-        QuantityDTO q2 = new QuantityDTO(2.0, QuantityDTO.LengthUnit.FEET);
-        QuantityDTO result = new QuantityDTO(3.0, QuantityDTO.LengthUnit.FEET);
-        when(mockService.add(q1, q2, QuantityDTO.LengthUnit.FEET)).thenReturn(result);
-        assertDoesNotThrow(() ->
-                controller.performAddition(q1, q2, QuantityDTO.LengthUnit.FEET));
-        verify(mockService).add(q1, q2, QuantityDTO.LengthUnit.FEET);
+    void testDivide_Returns200() throws Exception {
+        QuantityMeasurementDTO dto = successDTO("divide");
+        dto.setResultValue(5.0);
+        when(service.divide(any(), any())).thenReturn(dto);
+        mockMvc.perform(post("/api/v1/quantities/divide")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                buildInput("10.0","FEET","LengthUnit",
+                                        "2.0","FEET","LengthUnit"))))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void testPerformAddition_UnsupportedOperation_HandledGracefully() {
-        QuantityDTO t1 = new QuantityDTO(100.0, QuantityDTO.TemperatureUnit.CELSIUS);
-        QuantityDTO t2 = new QuantityDTO(50.0, QuantityDTO.TemperatureUnit.CELSIUS);
-        when(mockService.add(t1, t2, QuantityDTO.TemperatureUnit.CELSIUS))
-                .thenThrow(new QuantityMeasurementException("Addition not supported"));
-        assertDoesNotThrow(() ->
-                controller.performAddition(t1, t2, QuantityDTO.TemperatureUnit.CELSIUS));
+    void testInvalidInput_Returns400() throws Exception {
+        // Empty unit — fails @NotEmpty validation
+        String badBody = """
+            {"thisQuantityDTO":{"value":1.0,"unit":"","measurementType":"LengthUnit"},
+             "thatQuantityDTO":{"value":12.0,"unit":"INCHES","measurementType":"LengthUnit"}}
+            """;
+        mockMvc.perform(post("/api/v1/quantities/compare")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(badBody))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
-    void testPerformDivision_CallsService() {
-        QuantityDTO q1 = new QuantityDTO(10.0, QuantityDTO.LengthUnit.FEET);
-        QuantityDTO q2 = new QuantityDTO(2.0, QuantityDTO.LengthUnit.FEET);
-        when(mockService.divide(q1, q2)).thenReturn(5.0);
-        assertDoesNotThrow(() -> controller.performDivision(q1, q2));
-        verify(mockService).divide(q1, q2);
+    void testGetHistoryByOperation_Returns200() throws Exception {
+        when(service.getHistoryByOperation("COMPARE"))
+                .thenReturn(java.util.List.of(successDTO("compare")));
+        mockMvc.perform(get("/api/v1/quantities/history/operation/COMPARE"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void testGetOperationCount_Returns200() throws Exception {
+        when(service.getOperationCount("COMPARE")).thenReturn(3L);
+        mockMvc.perform(get("/api/v1/quantities/count/COMPARE"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("3"));
+    }
+
+    @Test
+    void testGetErrorHistory_Returns200() throws Exception {
+        when(service.getErrorHistory()).thenReturn(java.util.List.of());
+        mockMvc.perform(get("/api/v1/quantities/history/errored"))
+                .andExpect(status().isOk());
     }
 }
