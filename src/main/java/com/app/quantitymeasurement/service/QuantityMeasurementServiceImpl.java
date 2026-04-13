@@ -182,7 +182,7 @@ public class QuantityMeasurementServiceImpl implements IQuantityMeasurementServi
             e.setThatUnit(q2.getUnit());
             e.setThatMeasurementType(q2.getMeasurementType());
         }
-        e.setOperation(operation);
+        e.setOperation(operation.toUpperCase());
         e.setError(false);
         return e;
     }
